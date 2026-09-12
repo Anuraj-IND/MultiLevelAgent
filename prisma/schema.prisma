@@ -1,0 +1,214 @@
+// Prisma 7 schema — mirrors db/schema.sql (source of truth for models).
+// DB not yet migrated (needs pooled IPv4 URL); run `prisma migrate dev` once DATABASE_URL is set.
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Department {
+  code      String  @id
+  name      String
+  isActive  Boolean @default(true) @map("is_active")
+  hierarchy HierarchyNode[]
+
+  @@map("departments")
+}
+
+model HierarchyNode {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleLevel    Int            @map("role_level")
+  parentId     String?        @map("parent_id") @db.Uuid
+  parent       HierarchyNode? @relation("HierarchyTree", fields: [parentId], references: [id])
+  children     HierarchyNode[] @relation("HierarchyTree")
+  employeeName String?        @map("employee_name")
+  department   String?
+  dept         Department?    @relation(fields: [department], references: [code])
+  rms          Rm[]
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("hierarchy_nodes")
+}
+
+model Rm {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  phone        String         @unique
+  employeeCode String?        @map("employee_code")
+  hierarchyId  String?        @map("hierarchy_id") @db.Uuid
+  hierarchy    HierarchyNode? @relation(fields: [hierarchyId], references: [id])
+  status       String         @default("active")
+  lgs          Lg[]
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("rms")
+}
+
+model RegistrationDraft {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  phone           String
+  email           String
+  panNo           String    @map("pan_no")
+  phoneVerified   Boolean   @default(false) @map("phone_verified")
+  phoneVerifiedAt DateTime? @map("phone_verified_at") @db.Timestamptz
+  status          String    @default("open")
+  expiresAt       DateTime  @default(dbgenerated("now() + INTERVAL '48 hours'")) @map("expires_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  documents       LgDocument[]
+  tos             TosAcceptance[]
+  lgs             Lg[]
+
+  @@index([phone])
+  @@map("registration_drafts")
+}
+
+model Lg {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lgSeq               Int       @unique @default(autoincrement()) @map("lg_seq")
+  lgType              String    @default("INDIVIDUAL") @map("lg_type")
+  name                String
+  phone               String    @unique
+  email               String
+  panNo               String    @unique @map("pan_no")
+  aadhaarNoEncrypted  String?   @map("aadhaar_no_encrypted")
+  addressAadhaar      String?   @map("address_aadhaar")
+  pincode             String?
+  currentAddress      String?   @map("current_address")
+  sourceRmId          String?   @map("source_rm_id") @db.Uuid
+  sourceRm            Rm?       @relation(fields: [sourceRmId], references: [id])
+  ispName             String?   @map("isp_name")
+  poName              String?   @map("po_name")
+  verificationStatus  String    @default("pending") @map("verification_status")
+  verifiedBy          String?   @map("verified_by")
+  verifiedAt          DateTime? @map("verified_at") @db.Timestamptz
+  isActive            Boolean   @default(false) @map("is_active")
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz
+  typeSpecificData    Json      @default("{}") @map("type_specific_data")
+  draftId             String?   @map("draft_id") @db.Uuid
+  draft               RegistrationDraft? @relation(fields: [draftId], references: [id])
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  bankAccount         LgBankAccount?
+  documents           LgDocument[]
+  tos                 TosAcceptance[]
+  intents             PolicyIntent[]
+
+  @@map("lgs")
+}
+
+model LgBankAccount {
+  id                 String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lgId               String  @unique @map("lg_id") @db.Uuid
+  lg                 Lg      @relation(fields: [lgId], references: [id], onDelete: Cascade)
+  bankName           String  @map("bank_name")
+  branch             String?
+  ifsc               String
+  accountNoEncrypted String  @map("account_no_encrypted")
+  bankAddress        String? @map("bank_address")
+  ifscVerified       Boolean @default(false) @map("ifsc_verified")
+  ifscResponse       Json?   @map("ifsc_response")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("lg_bank_accounts")
+}
+
+model LgDocument {
+  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lgId      String?            @map("lg_id") @db.Uuid
+  lg        Lg?                @relation(fields: [lgId], references: [id], onDelete: Cascade)
+  draftId   String?            @map("draft_id") @db.Uuid
+  draft     RegistrationDraft? @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  docType   String             @map("doc_type")
+  fileUrl   String             @map("file_url")
+  fileHash  String             @map("file_hash")
+  mime      String
+  sizeBytes Int                @map("size_bytes")
+  version   Int                @default(1)
+  createdBy String?            @map("created_by")
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([draftId])
+  @@index([lgId])
+  @@map("lg_documents")
+}
+
+model TosVersion {
+  version    String   @id
+  text       String
+  textHash   String   @map("text_hash")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  acceptances TosAcceptance[]
+
+  @@map("tos_versions")
+}
+
+model TosAcceptance {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lgId         String?            @map("lg_id") @db.Uuid
+  lg           Lg?                @relation(fields: [lgId], references: [id])
+  draftId      String?            @map("draft_id") @db.Uuid
+  draft        RegistrationDraft? @relation(fields: [draftId], references: [id])
+  tosVersion   String             @map("tos_version")
+  tos          TosVersion         @relation(fields: [tosVersion], references: [version])
+  nameSnapshot String             @map("name_snapshot")
+  acceptedAt   DateTime           @default(now()) @map("accepted_at") @db.Timestamptz
+  ip           String?
+  userAgent    String?            @map("user_agent")
+
+  @@map("tos_acceptances")
+}
+
+model OtpVerification {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone      String
+  otpHash    String    @map("otp_hash")
+  purpose    String    @default("register")
+  expiresAt  DateTime  @default(dbgenerated("now() + INTERVAL '10 minutes'")) @map("expires_at") @db.Timestamptz
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([phone])
+  @@map("otp_verifications")
+}
+
+model PolicyIntent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lgId      String   @map("lg_id") @db.Uuid
+  lg        Lg       @relation(fields: [lgId], references: [id])
+  category  String
+  payload   Json     @default("{}")
+  status    String   @default("open")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("policy_intents")
+}
+
+model AuditLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId   String?  @map("actor_id")
+  actorType String?  @map("actor_type")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  oldValue  Json?    @map("old_value")
+  newValue  Json?    @map("new_value")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+model EventOutbox {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type      String
+  payload   Json
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("events_outbox")
+}

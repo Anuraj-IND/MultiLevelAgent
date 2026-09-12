@@ -1,0 +1,19 @@
+# env - never commit (but DO commit .env.example)
+.env
+.env.*
+!.env.example
+
+# deps / build
+node_modules/
+dist/
+
+# uploads (local dev only, prod uses Supabase Storage)
+uploads/
+
+# prisma
+generated/
+prisma/migrations/dev/
+
+# logs
+*.log
+npm-debug.log*
