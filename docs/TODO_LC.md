@@ -6,6 +6,7 @@
 - [x] First migration `20260912090110_init` applied via **session pooler** (IPv4); direct host is IPv6-only here
 - [x] Seed: 8 departments, TOS v1, `lg_seq` starts at 12345
 - [x] Full E2E `node e2e-lc.js`: init→OTP(123456)→step2→4 docs→TOS→submit(lg_seq 12345)→login→dashboard→catalog→intent→performance→verify approved→active true→list→CSV export. ALL GREEN
+- [x] Swagger: full spec in `openapi/` (base + parts/lg + parts/staff + parts/utils, 21 paths, request/response schemas + examples + bearer auth) served at `/api-docs` + `/openapi.json`; verified locally — every POST/PATCH shows its JSON body with Try-it-out
 - [x] SQL schema: drafts, lgs(lg_seq), bank, docs(versioned), TOS, OTP, rms, intents, audit, outbox
 - [x] Register/OTP/docs/TOS/submit/dashboard + sell/lead/renewal/performance stubs + CSV export
 - [x] IFSC proxy (Razorpay free, HDFC0001233 verified live), storage abstraction (local fallback active)
